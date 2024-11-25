@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CHAT</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="container">
+    <h1>Chat Pokémon</h1>
+    <label for="prompt">Insira seu prompt</label>
+    <textarea cols="40" rows="5" name="prompt" id="prompt"></textarea>
+    
+    <div id="chat-log" class="chat-log"></div>
+
+    <button id="send-btn">Enviar</button>
+  </div>
+
+  <!-- Pokébola como imagem -->
+  <div class="pokeball"></div>
+
+  <!-- Rodapé -->
+  <footer>
+    <p> Discente: Lara Aiko Sagai  IIW2022A - Pokémon Chatbot</p>
+  </footer>
+
+  <script type="module">
+    // Carregue o pacote via CDN
+    import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai";
+
+    // Chave de API (lembre-se de mantê-la privada em produção)
+    const API_KEY = "AIzaSyBQYYNqZS4B1DJYQ1JqM-MD5IXOHViPT2Y";
+
+    // Instanciar a API
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const generationConfig = {
+            temperature: 1,
+            topP: 0.95,
+            topK: 40,
+            maxOutputTokens: 8192,
+            responseMimeType: "text/plain",
+        };
+
+        const prompt_dev = "Gemini, nas próximas interações, você será um treinador Pokémon, trabalhando para curar pokemons e seu sonho é virar dançarino com seu Frogadier. Segue algumas regras: 1- Você não irá conversar de nenhum assunto que não seja pokemons: \n";
+
+        const historicoBot = [];
+        const historicoConversa = [];
+
+        // Corrigido o erro de digitação no `prompt_dev`
+        historicoBot.push({
+            role: "user",
+            parts: [{text: prompt_dev}]
+        });
+
+        async function obterRespostaDoBot(mensagemUsuario) {
+            try {
+                historicoConversa.push({ role: "user", content: mensagemUsuario });
+
+                // Limitando o histórico a 3 interações
+                const historicoLimitado = historicoConversa.slice(-3);
+                const contexto = historicoLimitado.map(item => `${item.role}: ${item.content}`).join('\n');
+
+                console.log("Contexto enviado:", contexto); // Log de depuração
+
+                // Corrigindo o uso do histórico correto na chamada da API
+                const chatSession = model.startChat({
+                    generationConfig,
+                    historicoBot// Usando 'historicoConversa' corretamente\
+                });
+
+                // Envia a mensagem e aguarda a resposta
+                historicoBot.push({role:"model", content: mensagemUsuario});
+                const result = await chatSession.sendMessage(mensagemUsuario);
+                const text = result.response.text; // Ajuste conforme a resposta da API
+
+                historicoConversa.push({ role: "bot", content: text });
+                historicoBot.push({ role: "model", content: text });
+                adicionarMensagemBot(text);
+            } catch (error) {
+                console.error("Erro ao obter resposta do bot:", error);
+                adicionarMensagemBot("Erro ao responder. Tente novamente.");
+            }
+        }
+
+    function adicionarMensagemUsuario(mensagem) {
+        const novaDiv = document.createElement("div");
+        novaDiv.className = "user-message";
+        novaDiv.textContent = mensagem;
+        document.getElementById("chat-log").appendChild(novaDiv);
+        document.getElementById("chat-log").scrollTop = document.getElementById("chat-log").scrollHeight;
+    }
+
+    function adicionarMensagemBot(mensagem) {
+        const novaDiv = document.createElement("div");
+        novaDiv.className = "bot-message";
+        novaDiv.textContent = mensagem;
+        document.getElementById("chat-log").appendChild(novaDiv);
+        document.getElementById("chat-log").scrollTop = document.getElementById("chat-log").scrollHeight;
+    }
+
+    document.getElementById("send-btn").addEventListener("click", () => {
+        const userInput = document.getElementById("prompt").value;
+        if (userInput.trim() !== "") {
+            adicionarMensagemUsuario(userInput);
+            obterRespostaDoBot(userInput);
+            document.getElementById("prompt").value = "";
+        }
+    });
+  </script>
+  
+</body>
+</html>
