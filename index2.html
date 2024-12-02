@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CHAT</title>
+  <title>CHAT Pokémon</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -18,74 +18,105 @@
     <button id="send-btn">Enviar</button>
   </div>
 
-  <!-- Pokébola como imagem -->
   <div class="pokeball"></div>
 
-  <!-- Rodapé -->
   <footer>
     <p> Discente: Lara Aiko Sagai  IIW2022A - Pokémon Chatbot</p>
   </footer>
 
   <script type="module">
-    // Carregue o pacote via CDN
-    import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai";
-
-    // Chave de API (lembre-se de mantê-la privada em produção)
-    const API_KEY = "AIzaSyBQYYNqZS4B1DJYQ1JqM-MD5IXOHViPT2Y";
-
-    // Instanciar a API
-    const genAI = new GoogleGenerativeAI(API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-    const historicoConversa = [];
-
-    async function obterRespostaDoBot(mensagemUsuario) {
-        try {
-            historicoConversa.push({ role: "user", content: mensagemUsuario });
-
-            const historicoLimitado = historicoConversa.slice(-3);
-            const contexto = historicoLimitado.map(item => `${item.role}: ${item.content}`).join('\n');
-
-            const prompt = `Gemini, nas próximas interações, você será um treinador Pokémon, trabalhando para curar pokemons e seu sonho é virar dançarino com seu Frogadier. Segue algumas regras: 1- Você não irá conversar de nenhum assunto que não seja pokemons. \n${contexto}`;
-
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            const text = await response.text();
-
-            historicoConversa.push({ role: "bot", content: text });
-
-            adicionarMensagemBot(text);
-        } catch (error) {
-            console.error("Erro ao obter resposta do bot:", error);
-            adicionarMensagemBot("Erro ao responder. Tente novamente.");
+    const API_URL = "http://localhost:5000/api";  // URL do backend (ajuste conforme necessário)
+    const API_KEY = "AIzaSyBQYYNqZS4B1DJYQ1JqM-MD5IXOHViPT2Y";  // Substitua pela sua chave API (gerada no backend)
+    
+    // Função para obter o histórico de conversas do usuário
+    async function obterHistoricoConversa(userId) {
+      try {
+        const response = await fetch(`${API_URL}/conversations?userId=${userId}`, {
+          headers: {
+            'Authorization': `Bearer ${API_KEY}`  // Enviando chave API no cabeçalho
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          return data;
+        } else {
+          throw new Error("Erro ao obter histórico.");
         }
+      } catch (error) {
+        console.error(error);
+        return [];
+      }
     }
 
+    // Função para enviar mensagem para o backend
+    async function enviarMensagemParaBot(userInput, userId) {
+      try {
+        const response = await fetch(`${API_URL}/conversations`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            'Authorization': `Bearer ${API_KEY}`  // Enviando chave API no cabeçalho
+          },
+          body: JSON.stringify({ userId, message: userInput })
+        });
+        const data = await response.json();
+        return data.message; // Retorna a resposta do bot
+      } catch (error) {
+        console.error("Erro ao enviar mensagem:", error);
+        return "Erro ao responder. Tente novamente.";
+      }
+    }
+
+    // Função para adicionar a mensagem do usuário na tela
     function adicionarMensagemUsuario(mensagem) {
-        const novaDiv = document.createElement("div");
-        novaDiv.className = "user-message";
-        novaDiv.textContent = mensagem;
-        document.getElementById("chat-log").appendChild(novaDiv);
-        document.getElementById("chat-log").scrollTop = document.getElementById("chat-log").scrollHeight;
+      const novaDiv = document.createElement("div");
+      novaDiv.className = "user-message";
+      novaDiv.textContent = mensagem;
+      document.getElementById("chat-log").appendChild(novaDiv);
+      document.getElementById("chat-log").scrollTop = document.getElementById("chat-log").scrollHeight;
     }
 
+    // Função para adicionar a mensagem do bot na tela
     function adicionarMensagemBot(mensagem) {
-        const novaDiv = document.createElement("div");
-        novaDiv.className = "bot-message";
-        novaDiv.textContent = mensagem;
-        document.getElementById("chat-log").appendChild(novaDiv);
-        document.getElementById("chat-log").scrollTop = document.getElementById("chat-log").scrollHeight;
+      const novaDiv = document.createElement("div");
+      novaDiv.className = "bot-message";
+      novaDiv.textContent = mensagem;
+      document.getElementById("chat-log").appendChild(novaDiv);
+      document.getElementById("chat-log").scrollTop = document.getElementById("chat-log").scrollHeight;
     }
 
-    document.getElementById("send-btn").addEventListener("click", () => {
+    // Função para iniciar o chat
+    async function iniciarChat() {
+      const userId = "usuario123";  // Usando um identificador fixo ou gerado para o usuário
+      const historico = await obterHistoricoConversa(userId);
+      
+      // Exibe as mensagens anteriores
+      historico.forEach(mensagem => {
+        if (mensagem.role === "user") {
+          adicionarMensagemUsuario(mensagem.message);
+        } else {
+          adicionarMensagemBot(mensagem.message);
+        }
+      });
+
+      // **Prompt inicial Pokémon** - Uma saudação do bot, com tema Pokémon
+      adicionarMensagemBot("Pikachu! Pika Pika! Olá, treinador! Eu sou o Pikachu, seu parceiro Pokémon. Como posso ajudá-lo hoje?");
+
+      // Lida com o clique do botão para enviar uma nova mensagem
+      document.getElementById("send-btn").addEventListener("click", async () => {
         const userInput = document.getElementById("prompt").value;
         if (userInput.trim() !== "") {
-            adicionarMensagemUsuario(userInput);
-            obterRespostaDoBot(userInput);
-            document.getElementById("prompt").value = "";
+          adicionarMensagemUsuario(userInput);
+          const respostaBot = await enviarMensagemParaBot(userInput, userId);
+          adicionarMensagemBot(respostaBot);
+          document.getElementById("prompt").value = "";
         }
-    });
+      });
+    }
+
+    // Inicia o chat
+    iniciarChat();
   </script>
-  
+
 </body>
 </html>
